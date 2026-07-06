@@ -1,44 +1,20 @@
 ---
-- name: Mock Microservice Status Check
+- name: Mock Service Status Check
   hosts: localhost
   gather_facts: false
 
   tasks:
 
-    - name: Print Mock On-Prem Service
+    - name: Mock Service Check
       debug:
         msg:
-          - "Service : aimlmanagerSG1"
-          - "Host    : microsvc1.sg1.highqsolutions.com"
-          - "Status  : UP"
-          - "Version : 2.33.0"
+          - "Service: aimlmanagerSG1"
+          - "Status : UP"
+          - "Version: 2.33.0"
 
-    - name: Print Mock On-Prem Service Node 2
+    - name: Mock AKS Pod
       debug:
         msg:
-          - "Service : aimlmanagerSG1"
-          - "Host    : microsvc2.sg1.highqsolutions.com"
-          - "Status  : UP"
-          - "Version : 2.33.0"
-
-    - name: Print Mock AKS Service
-      debug:
-        msg:
-          - "Service : prd1isheet1zus1"
-          - "URL     : prd1isheet1.zus1.highqsolutions.com"
-          - "Status  : UP"
-          - "Version : 2.0.0"
-
-    - name: Print Mock AKS Pods
-      debug:
-        msg:
-          - "Pod : prd1isheet1zus1-pod1"
-          - "Status : Running"
-          - "Node : aks-node-01"
-
-    - name: Print Mock AKS Pods 2
-      debug:
-        msg:
-          - "Pod : prd1isheet1zus1-pod2"
-          - "Status : Running"
-          - "Node : aks-node-02"
+          - "Pod: prd1isheet1zus1-pod1"
+          - "Status: Running"
+          - "Node: aks-node-01"
