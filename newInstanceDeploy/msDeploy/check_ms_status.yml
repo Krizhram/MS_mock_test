@@ -1,20 +1,69 @@
 ---
-- name: Mock Service Status Check
+- name: Microservice Health Check
   hosts: localhost
   gather_facts: false
 
+  vars:
+    # Mock data (replace with actual commands for production)
+    mock_mode: true
+
   tasks:
 
-    - name: Mock Service Check
-      debug:
-        msg:
-          - "Service: aimlmanagerSG1"
-          - "Status : UP"
-          - "Version: 2.33.0"
+    - name: Get Service Status (Mock)
+      set_fact:
+        services:
+          - name: "aimlmanagerSG1"
+            host: "microsvc1.sg1.highqsolutions.com"
+            status: "UP"
+            version: "2.33.0"
+          - name: "aimlmanagerSG1"
+            host: "microsvc2.sg1.highqsolutions.com"
+            status: "UP"
+            version: "2.33.0"
 
-    - name: Mock AKS Pod
+    - name: Get Pod Status (Mock)
+      set_fact:
+        pods:
+          - name: "prd1isheet1zus1-pod1"
+            status: "Running"
+            node: "aks-node-01"
+          - name: "prd1isheet1zus1-pod2"
+            status: "Running"
+            node: "aks-node-02"
+
+    - name: Validate Service Status
+      assert:
+        that:
+          - item.status == "UP"
+        fail_msg: "Service {{ item.name }} on {{ item.host }} is {{ item.status }}"
+        success_msg: "✅ Service {{ item.name }} is UP (v{{ item.version }})"
+      loop: "{{ services }}"
+
+    - name: Validate Pod Status
+      assert:
+        that:
+          - item.status == "Running"
+        fail_msg: "Pod {{ item.name }} on node {{ item.node }} is {{ item.status }}"
+        success_msg: "✅ Pod {{ item.name }} is Running"
+      loop: "{{ pods }}"
+
+    - name: Generate Health Report
       debug:
         msg:
-          - "Pod: prd1isheet1zus1-pod1"
-          - "Status: Running"
-          - "Node: aks-node-01"
+          - "=========================================="
+          - "Microservice Health Check Report"
+          - "=========================================="
+          - ""
+          - "Services:"
+          - "{{ services | to_nice_yaml }}"
+          - ""
+          - "Pods:"
+          - "{{ pods | to_nice_yaml }}"
+          - ""
+          - "=========================================="
+          - "✅ All health checks passed"
+          - "=========================================="
+
+    - name: Set Overall Status
+      set_fact:
+        health_status: "HEALTHY"
