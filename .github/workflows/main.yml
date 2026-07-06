@@ -3,22 +3,6 @@ name: Microservice Health Check - Mock Test
 on:
   workflow_dispatch:
     inputs:
-      instance_name:
-        description: Instance Name
-        required: true
-        default: aimlmanagerSG1
-        type: string
-
-      environment_name:
-        description: Environment Name
-        required: true
-        type: choice
-        options:
-          - sg1
-          - uatsg1
-          - dev1zus1
-          - prd1zus1
-
       test_scenario:
         description: Test Scenario
         required: true
@@ -26,11 +10,6 @@ on:
         options:
           - healthy
           - unhealthy
-
-run-name: >
-  Mock Health Check -
-  ${{ inputs.instance_name }}
-  (${{ inputs.environment_name }})
 
 jobs:
   mock-health-check:
@@ -46,7 +25,6 @@ jobs:
           cat <<EOF >/tmp/service_status.csv
           aimlmanagerSG1,microsvc1.sg1.highqsolutions.com,UP,2.33.0
           aimlmanagerSG1,microsvc2.sg1.highqsolutions.com,UP,2.33.0
-          prd1isheet1zus1,prd1isheet1.zus1.highqsolutions.com,UP,2.0.0
           EOF
 
           cat <<EOF >/tmp/pod_status.csv
@@ -61,7 +39,6 @@ jobs:
           cat <<EOF >/tmp/service_status.csv
           aimlmanagerSG1,microsvc1.sg1.highqsolutions.com,UP,2.33.0
           aimlmanagerSG1,microsvc2.sg1.highqsolutions.com,DOWN,N/A
-          prd1isheet1zus1,prd1isheet1.zus1.highqsolutions.com,DOWN,N/A
           EOF
 
           cat <<EOF >/tmp/pod_status.csv
@@ -69,9 +46,8 @@ jobs:
           prd1isheet1zus1-pod2,CrashLoopBackOff,aks-node-02
           EOF
 
-      - name: Debug Generated Files
+      - name: Verify Mock Files
         run: |
-
           echo "===== service_status.csv ====="
           cat /tmp/service_status.csv
 
@@ -79,66 +55,59 @@ jobs:
           echo "===== pod_status.csv ====="
           cat /tmp/pod_status.csv
 
-      - name: Generate Summary Report
-        if: always()
+      - name: Generate Summary
         run: |
 
           OVERALL="GREEN"
 
-          echo "# Microservice Status Report" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "# Microservice Status Report"
+            echo ""
+            echo "## Service Status"
+            echo ""
+            echo "| Service | Host | Status | Version |"
+            echo "|---------|------|--------|---------|"
 
-          echo "## Service Status" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+            while IFS=',' read -r SERVICE HOST STATUS VERSION
+            do
+              if [ "$STATUS" = "UP" ]; then
+                ICON="✅"
+              else
+                ICON="🚨"
+                OVERALL="RED"
+              fi
 
-          echo "| Service | Host/URL | Status | Version |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---------|----------|--------|---------|" >> "$GITHUB_STEP_SUMMARY"
+              echo "| $SERVICE | $HOST | $ICON $STATUS | $VERSION |"
+            done < /tmp/service_status.csv
 
-          while IFS=',' read SERVICE HOST STATUS VERSION
-          do
+            echo ""
+            echo "## AKS Pod Status"
+            echo ""
+            echo "| Pod | Status | Node |"
+            echo "|-----|--------|------|"
 
-            if [ "$STATUS" = "UP" ]; then
-              ICON="✅"
+            while IFS=',' read -r POD STATUS NODE
+            do
+              if [ "$STATUS" = "Running" ]; then
+                ICON="✅"
+              else
+                ICON="🚨"
+                OVERALL="RED"
+              fi
+
+              echo "| $POD | $ICON $STATUS | $NODE |"
+            done < /tmp/pod_status.csv
+
+            echo ""
+
+            if [ "$OVERALL" = "GREEN" ]; then
+              echo "## ✅ Overall Status: Healthy"
             else
-              ICON="🚨"
-              OVERALL="RED"
+              echo "## 🚨 Overall Status: Unhealthy"
             fi
 
-            echo "| $SERVICE | $HOST | $ICON $STATUS | $VERSION |" >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          done < /tmp/service_status.csv
-
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "## AKS Pod Status" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
-          echo "| Pod | Status | Node |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-----|--------|------|" >> "$GITHUB_STEP_SUMMARY"
-
-          while IFS=',' read POD STATUS NODE
-          do
-
-            if [ "$STATUS" = "Running" ]; then
-              ICON="✅"
-            else
-              ICON="🚨"
-              OVERALL="RED"
-            fi
-
-            echo "| $POD | $ICON $STATUS | $NODE |" >> "$GITHUB_STEP_SUMMARY"
-
-          done < /tmp/pod_status.csv
-
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$OVERALL" = "GREEN" ]; then
-            echo "## ✅ Overall Status: Healthy" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "## 🚨 Overall Status: Unhealthy" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Fail Workflow For Unhealthy Scenario
+      - name: Fail Unhealthy Run
         if: ${{ github.event.inputs.test_scenario == 'unhealthy' }}
-        run: |
-          echo "Unhealthy scenario selected"
-          exit 1
+        run: exit 1
