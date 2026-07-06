@@ -14,11 +14,9 @@ on:
 
 jobs:
   mock-health-check:
-
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Generate Healthy Mock Data
         if: ${{ github.event.inputs.test_scenario == 'healthy' }}
         run: |
@@ -49,22 +47,28 @@ jobs:
         run: |
           echo "==== service_status.csv ===="
           cat /tmp/service_status.csv
-
           echo
           echo "==== pod_status.csv ===="
           cat /tmp/pod_status.csv
 
       - name: Generate Summary
+        if: always()
         run: |
-
           OVERALL="GREEN"
 
+          # Determine if files exist and check status
+          if [ ! -f /tmp/service_status.csv ] || [ ! -f /tmp/pod_status.csv ]; then
+            echo "## 🚨 Error: Status files not found" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           echo "# Microservice Status Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
           echo "## Service Status" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-
           echo "| Service | Host | Status | Version |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---------|------|--------|---------|" >> "$GITHUB_STEP_SUMMARY"
 
@@ -76,15 +80,12 @@ jobs:
               ICON="🚨"
               OVERALL="RED"
             fi
-
             echo "| $SERVICE | $HOST | $ICON $STATUS | $VERSION |" >> "$GITHUB_STEP_SUMMARY"
           done < /tmp/service_status.csv
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
-
           echo "## AKS Pod Status" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-
           echo "| Pod | Status | Node |" >> "$GITHUB_STEP_SUMMARY"
           echo "|-----|--------|------|" >> "$GITHUB_STEP_SUMMARY"
 
@@ -96,7 +97,6 @@ jobs:
               ICON="🚨"
               OVERALL="RED"
             fi
-
             echo "| $POD | $ICON $STATUS | $NODE |" >> "$GITHUB_STEP_SUMMARY"
           done < /tmp/pod_status.csv
 
@@ -104,10 +104,17 @@ jobs:
 
           if [ "$OVERALL" = "GREEN" ]; then
             echo "## ✅ Overall Status: Healthy" >> "$GITHUB_STEP_SUMMARY"
+            echo "All services and pods are running normally." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "## 🚨 Overall Status: Unhealthy" >> "$GITHUB_STEP_SUMMARY"
+            echo "One or more services/pods are not healthy. Immediate action required!" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Fail Unhealthy Run
-        if: ${{ github.event.inputs.test_scenario == 'unhealthy' }}
-        run: exit 1
+      - name: Report Status
+        if: always()
+        run: |
+          if [ "${{ github.event.inputs.test_scenario }}" = "unhealthy" ]; then
+            echo "❌ Unhealthy scenario detected"
+            exit 1
+          fi
+          echo "✅ Healthy scenario completed successfully"
